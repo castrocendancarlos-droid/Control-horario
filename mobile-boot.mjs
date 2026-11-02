@@ -1,0 +1,12 @@
+import * as mobile from './mobile-storage.mjs';
+const ready=async()=>{try{await mobile.initialize();window.MiJornadaMobile=mobile;await import('./app.js');setupBackups();if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});}catch(e){document.getElementById('content').textContent=e.message;}};
+function setupBackups(){const dialog=document.getElementById('jsonDialog'),file=document.getElementById('jsonFile'),preview=document.getElementById('jsonPreview'),error=document.getElementById('jsonError'),apply=document.getElementById('applyImport');let incoming=null;
+ document.getElementById('importTop').onclick=async()=>{file.value='';incoming=null;apply.disabled=true;preview.textContent='Elige una copia JSON. Se combinarán sus años y fichajes con los de este dispositivo; en una fecha coincidente se utilizará el registro de la copia.';error.textContent='';document.getElementById('recoverJson').disabled=!await mobile.read('previous');dialog.showModal();};
+ document.getElementById('closeJson').onclick=()=>dialog.close();
+ document.getElementById('exportJson').onclick=async()=>{try{await mobile.exportJson();error.textContent='Copia preparada. Guarda el archivo en Archivos o iCloud Drive.';}catch(e){error.textContent=e.message;}};
+ file.onchange=async()=>{apply.disabled=true;incoming=null;error.textContent='';if(!file.files[0])return;try{incoming=await mobile.inspectImport(file.files[0]);const current=await mobile.read(),dates=new Set(current.days.map(x=>x.date)),overlap=incoming.days.filter(d=>dates.has(d.date)).length;preview.textContent=`Copia válida: ${incoming.settings.map(x=>x.year).join(', ')} · ${incoming.days.length} registros diarios · ${incoming.original.length} referencias de Excel. Se reemplazarán ${overlap} fechas coincidentes. Se guardará el estado actual antes de importar.`;apply.disabled=false;}catch(e){error.textContent=e.message;}};
+ apply.onclick=async()=>{if(!incoming)return;apply.disabled=true;try{await mobile.importPayload(incoming);location.reload();}catch(e){error.textContent=e.message;apply.disabled=false;}};
+ document.getElementById('recoverJson').onclick=async()=>{try{await mobile.recoverPrevious();location.reload();}catch(e){error.textContent=e.message;}};
+ document.addEventListener('click',async e=>{const a=e.target.closest('a[href^="/api/export"]');if(!a)return;e.preventDefault();try{await mobile.exportCsv(Number(new URL(a.href).searchParams.get('year')));}catch(err){error.textContent=err.message;dialog.showModal();}});
+}
+ready();
